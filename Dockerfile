@@ -23,10 +23,7 @@ RUN make install
 
 WORKDIR /root
 
-COPY nginx.conf /etc/nginx/mine.conf
-RUN cp /usr/local/nginx/conf/nginx.conf /etc/nginx/nginx.conf
-RUN cat /etc/nginx/mine.conf >> /etc/nginx/nginx.conf
-RUN rm /etc/nginx/mine.conf
+COPY nginx.conf /etc/nginx/nginx.conf
 
 CMD ["/usr/local/nginx/sbin/nginx", "-c", "/etc/nginx/nginx.conf"]
 
