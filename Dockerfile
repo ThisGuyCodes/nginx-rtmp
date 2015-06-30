@@ -9,11 +9,13 @@ RUN apt-get update ;\
 
 WORKDIR /root
 
-ADD http://nginx.org/download/nginx-1.8.0.tar.gz /root/
+# Downloaded from http://nginx.org/download/nginx-1.8.0.tar.gz
+COPY nginx-1.8.0.tar.gz /root/
 RUN tar -xvz < nginx-1.8.0.tar.gz
 
-ADD https://github.com/arut/nginx-rtmp-module/archive/v1.1.7.tar.gz /root/
-RUN tar -xvz < v1.1.7.tar.gz
+# Downloaded from https://github.com/arut/nginx-rtmp-module/archive/v1.1.7.tar.gz
+COPY nginx-rtmp-module-v1.1.7.tar.gz /root/
+RUN tar -xvz < nginx-rtmp-module-v1.1.7.tar.gz
 
 WORKDIR /root/nginx-1.8.0
 
