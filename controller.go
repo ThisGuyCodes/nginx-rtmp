@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	host       = "ws://renderhost.apps.zefr.com:4444/"
+	renderHost = "ws://renderhost.apps.zefr.com:4444/"
 	origin     = "http://client.obsremote.com"
 	feedSource = "http://monsterkill.apps.zefr.com:5000/action_feeds"
 )
@@ -73,7 +73,7 @@ type actionStatus struct {
 }
 
 func main() {
-	ws, err := websocket.Dial(host, "obsapi", origin)
+	ws, err := websocket.Dial(renderHost, "obsapi", origin)
 	if err != nil {
 		log.Fatal(err)
 	}
