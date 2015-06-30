@@ -11,9 +11,10 @@ import (
 )
 
 const (
-	renderHost = "ws://172.16.11.29:4444/"
+	renderHost = "ws://renderhost.apps.zefr.com:4444/"
 	origin     = "http://client.obsremote.com"
-	feedSource = "http://172.16.10.115:5000/action_feeds"
+	feedSource = "http://monsterkill.apps.zefr.com:5000/action_feeds"
+	feedList   = "http://monsterkill.apps.zefr.com:5000/feeds_list"
 )
 
 var (
@@ -24,6 +25,13 @@ type setOrderRequest struct {
 	RequestType string   `json:"request-type"`
 	SceneNames  []string `json:"scene-names"`
 	MessageID   int      `json:"message-id,string"`
+}
+
+type setSourceRender struct {
+	RequestType string `json:"request-type"`
+	Source      string `json:"source"`
+	Render      bool   `json:"render"`
+	MessageID   int    `json:"message-id,string"`
 }
 
 func nullWebsocket(ws *websocket.Conn) {
@@ -68,6 +76,41 @@ func setNewActive(left int, right int, ws *websocket.Conn) error {
 	return nil
 }
 
+func setSide(num int, side string, ws *websocket.Conn) error {
+	left := setSourceRender{
+		RequestType: "SetSourceRender",
+		Source:      fmt.Sprintf("%03d-left", num),
+		MessageID:   msgID,
+	}
+	msgID++
+	right := setSourceRender{
+		RequestType: "SetSourceRender",
+		Source:      fmt.Sprintf("%03d-right", num),
+		MessageID:   msgID,
+	}
+	msgID++
+
+	if side == "left" {
+		left.Render = true
+		right.Render = false
+	} else if side == "right" {
+		right.Render = true
+		left.Render = false
+	} else {
+		log.Fatal("wtf did you give me?", side)
+	}
+
+	err := websocket.JSON.Send(ws, left)
+	if err != nil {
+		return err
+	}
+	websocket.JSON.Send(ws, right)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type actionStatus struct {
 	Players struct {
 		Left struct {
@@ -77,6 +120,13 @@ type actionStatus struct {
 			Name string `json:"hostName"`
 		} `json:"red"`
 	} `json:"feeds"`
+}
+
+type feedsList struct {
+	Players []struct {
+		HostName string `json:"hostName"`
+		Team     string `json:"team"`
+	} `json:"players"`
 }
 
 func main() {
@@ -94,25 +144,78 @@ func main() {
 
 	time.Sleep(1 * time.Second)
 
+sleepLoop:
 	for {
+		time.Sleep(1 * time.Second)
 		resp, err := http.Get(feedSource)
-		defer resp.Body.Close()
 
 		if err != nil {
-			log.Fatal(err)
+			log.Print(err)
+			continue sleepLoop
 		}
+		defer resp.Body.Close()
 
 		current := new(actionStatus)
 
 		decoder := json.NewDecoder(resp.Body)
-		decoder.Decode(current)
+		err = decoder.Decode(current)
+		if err != nil {
+			log.Println(err)
+			continue sleepLoop
+		}
 
 		var leftInt, rightInt int
-		fmt.Sscanf(current.Players.Left.Name, "zefr%03d", &leftInt)
-		fmt.Sscanf(current.Players.Right.Name, "zefr%03d", &rightInt)
+		_, err = fmt.Sscanf(current.Players.Left.Name, "zefr%03d", &leftInt)
+		if err != nil {
+			log.Print(err)
+			continue sleepLoop
+		}
+		_, err = fmt.Sscanf(current.Players.Right.Name, "zefr%03d", &rightInt)
+		if err != nil {
+			log.Print(err)
+			continue sleepLoop
+		}
 		log.Printf("left: %d, right: %d", leftInt, rightInt)
-		setNewActive(leftInt, rightInt, ws)
+		err = setNewActive(leftInt, rightInt, ws)
+		if err != nil {
+			log.Println(err)
+		}
 
-		time.Sleep(1 * time.Second)
+		resp, err = http.Get(feedList)
+		if err != nil {
+			log.Print(err)
+			continue sleepLoop
+		}
+		defer resp.Body.Close()
+
+		feeds := new(feedsList)
+		decoder = json.NewDecoder(resp.Body)
+		err = decoder.Decode(&feeds)
+		if err != nil {
+			log.Println(err)
+			continue sleepLoop
+		}
+
+		for _, feed := range feeds.Players {
+			var thisNum int
+			_, err = fmt.Sscanf(feed.HostName, "zefr%03d", &thisNum)
+			if err != nil {
+				log.Print(err)
+				continue sleepLoop
+			}
+			if feed.Team == "Blue" {
+				err = setSide(thisNum, "left", ws)
+			} else if feed.Team == "Red" {
+				err = setSide(thisNum, "right", ws)
+			} else {
+				log.Print("wtf is this team", feeds)
+				continue sleepLoop
+			}
+			if err != nil {
+				log.Print(err)
+				continue sleepLoop
+			}
+		}
+
 	}
 }
