@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	host       = "ws://localhost:4444/"
+	host       = "ws://renderhost.apps.zefr.com:4444/"
 	origin     = "http://client.obsremote.com"
 	feedSource = "http://monsterkill.apps.zefr.com:5000/action_feeds"
 )
