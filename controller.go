@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	renderHost = "ws://renderhost.apps.zefr.com:4444/"
+	renderHost = "ws://172.16.11.29:4444/"
 	origin     = "http://client.obsremote.com"
-	feedSource = "http://monsterkill.apps.zefr.com:5000/action_feeds"
+	feedSource = "http://172.16.10.115:5000/action_feeds"
 )
 
 var (
@@ -35,30 +35,37 @@ func nullWebsocket(ws *websocket.Conn) {
 	}()
 }
 
+var oldLeft, oldRight int
+
 func setNewActive(left int, right int, ws *websocket.Conn) error {
-	order := make([]string, 0, 20)
+	if oldLeft != left || oldRight != right {
+		oldLeft, oldRight = left, right
+		order := make([]string, 0, 20)
 
-	order = append(order, fmt.Sprintf("%03d-left", left))
-	order = append(order, fmt.Sprintf("%03d-right", right))
+		order = append(order, fmt.Sprintf("%03d-left", left))
+		order = append(order, fmt.Sprintf("%03d-right", right))
 
-	order = append(order, fmt.Sprintf("%03d-right", left))
-	order = append(order, fmt.Sprintf("%03d-left", right))
+		order = append(order, fmt.Sprintf("%03d-right", left))
+		order = append(order, fmt.Sprintf("%03d-left", right))
 
-	for i := 1; i < 11; i++ {
-		if i != left && i != right {
-			thisLeft := fmt.Sprintf("%03d-left", i)
-			thisRight := fmt.Sprintf("%03d-right", i)
-			order = append(order, thisLeft, thisRight)
+		for i := 1; i < 11; i++ {
+			if i != left && i != right {
+				thisLeft := fmt.Sprintf("%03d-left", i)
+				thisRight := fmt.Sprintf("%03d-right", i)
+				order = append(order, thisLeft, thisRight)
+			}
 		}
-	}
+		log.Println(order)
 
-	req := setOrderRequest{
-		RequestType: "SetSourceOrder",
-		SceneNames:  order,
-		MessageID:   msgID,
+		req := setOrderRequest{
+			RequestType: "SetSourceOrder",
+			SceneNames:  order,
+			MessageID:   msgID,
+		}
+		msgID++
+		return websocket.JSON.Send(ws, req)
 	}
-	msgID++
-	return websocket.JSON.Send(ws, req)
+	return nil
 }
 
 type actionStatus struct {
@@ -100,8 +107,11 @@ func main() {
 		decoder := json.NewDecoder(resp.Body)
 		decoder.Decode(current)
 
-		log.Print("left:" + current.Players.Left.Name)
-		log.Print("right:" + current.Players.Right.Name)
+		var leftInt, rightInt int
+		fmt.Sscanf(current.Players.Left.Name, "zefr%03d", &leftInt)
+		fmt.Sscanf(current.Players.Right.Name, "zefr%03d", &rightInt)
+		log.Printf("left: %d, right: %d", leftInt, rightInt)
+		setNewActive(leftInt, rightInt, ws)
 
 		time.Sleep(1 * time.Second)
 	}
