@@ -23,6 +23,8 @@ RUN make install
 
 WORKDIR /root
 
+RUN mkdir -p /var/log/nginx
+
 COPY nginx.conf /etc/nginx/nginx.conf
 
 CMD ["/usr/local/nginx/sbin/nginx", "-c", "/etc/nginx/nginx.conf"]
